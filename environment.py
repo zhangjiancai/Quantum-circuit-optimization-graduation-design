@@ -31,9 +31,11 @@ class QuantumCircuitSimulator:
             padded_vector[:len(state_vector)] = state_vector
         else:
             padded_vector = state_vector
-        # Reshape to 4D: (1, channels, height, width)
-        return torch.tensor(padded_vector).view(1, 1, self.n_qubits, -1)
-
+        # 计算目标形状：batch_size = 1, channels = 1, height = n_qubits, width = n_states // n_qubits
+        height = self.n_qubits
+        width = int(np.ceil(n_states / height))  # 向上取整以确保宽度足够
+        padded_vector = np.pad(padded_vector, (0, height * width - n_states))  # 用0填充到完整的形状
+        return torch.tensor(padded_vector, dtype=torch.float32).view(1, 1, height, width)
 
     def apply_rule(self, rule):
         """Apply a transformation rule to the circuit."""

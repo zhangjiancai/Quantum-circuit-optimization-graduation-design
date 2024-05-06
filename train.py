@@ -27,7 +27,9 @@ def collect_episode_data(state, steps):
     states, actions, rewards, dones, old_log_probs, values = [], [], [], [], [], []
 
     for _ in range(steps):
+        state = state.squeeze(0)  # 移除多余的第一个维度
         with torch.no_grad():
+            policy, value = agent(state.unsqueeze(0))  # 重新添加批次维度
             policy, value = agent(state.unsqueeze(0))
             policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)
             masked_policy = policy * action_mask.mask(env.simulator.circuit)
