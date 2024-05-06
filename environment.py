@@ -4,9 +4,10 @@ import numpy as np
 
 class QuantumCircuitSimulator:
     """Quantum Circuit Simulator using Cirq."""
-    def __init__(self, n_qubits, n_moments):
+    def __init__(self, n_qubits, n_moments, n_gate_classes):
         self.n_qubits = n_qubits
         self.n_moments = n_moments
+        self.n_gate_classes = n_gate_classes
         self.qubits = [cirq.GridQubit(i, 0) for i in range(n_qubits)]
         self.circuit = cirq.Circuit()
         self.reset()
@@ -22,21 +23,34 @@ class QuantumCircuitSimulator:
         return self.get_state()
 
     def get_state(self):
-        """Return circuit state as a tensor (4D)."""
-        state_vector = np.real(cirq.Simulator().simulate(self.circuit).state_vector())
-        n_states = 2 ** self.n_qubits
-        if len(state_vector) < n_states:
-            # Pad with zeros to match required size
-            padded_vector = np.zeros(n_states)
-            padded_vector[:len(state_vector)] = state_vector
-        else:
-            padded_vector = state_vector
-        # 计算目标形状：batch_size = 1, channels = 1, height = n_qubits, width = n_states // n_qubits
-        height = self.n_qubits
-        width = int(np.ceil(n_states / height))  # 向上取整以确保宽度足够
-        padded_vector = np.pad(padded_vector, (0, height * width - n_states))  # 用0填充到完整的形状
-        return torch.tensor(padded_vector, dtype=torch.float32).view(1, 1, height, width)
+        """Return circuit state as a tensor (4D)。"""
+        # 用 4 个通道模拟门操作，假设每个门类型代表一个通道
+        state_tensor = np.zeros((self.n_qubits, self.n_moments, self.n_gate_classes), dtype=np.float32)
 
+        # 示例：根据模拟电路的门操作填充状态张量
+        for op in self.circuit.all_operations():
+            qubits = [q.row for q in op.qubits]
+            gate_type = self.get_gate_type(op.gate)
+            if gate_type is not None:
+                for qubit in qubits:
+                    # 使用时间索引和门索引进行填充
+                    moment_index = min(self.n_moments - 1, len(self.circuit))
+                    state_tensor[qubit, moment_index, gate_type] = 1.0
+
+        return torch.tensor(state_tensor).permute(2, 0, 1).unsqueeze(0)  # [batch, channels, height, width]
+
+    def get_gate_type(self, gate):
+        """获取门类型的索引。"""
+        gate_types = ['RZ', 'PX', 'CNOT', 'SWAP']
+        if isinstance(gate, cirq.RzPowGate):
+            return gate_types.index('RZ')
+        if isinstance(gate, cirq.XPowGate):
+            return gate_types.index('PX')
+        if isinstance(gate, cirq.CNotPowGate):
+            return gate_types.index('CNOT')
+        if isinstance(gate, cirq.SwapPowGate):
+            return gate_types.index('SWAP')
+        return None
     def apply_rule(self, rule):
         """Apply a transformation rule to the circuit."""
         rule(self)
@@ -57,9 +71,17 @@ class QuantumCircuitSimulator:
         return False
 
 class QuantumCircuitEnvironment:
-    """RL environment for quantum circuit optimization."""
-    def __init__(self, n_qubits, n_moments, rules):
-        self.simulator = QuantumCircuitSimulator(n_qubits, n_moments)
+    """RL environment for quantum circuit optimization."""    
+    def __init__(self, n_qubits, n_moments, rules, n_gate_classes):
+        """
+        Initialize the quantum circuit environment.
+        
+        :param n_qubits: Number of qubits in the circuit.
+        :param n_moments: Number of moments (time steps) in the circuit.
+        :param rules: List of transformation rules applicable to the circuit.
+        :param n_gate_classes: Number of distinct gate classes considered in the simulation.
+        """
+        self.simulator = QuantumCircuitSimulator(n_qubits, n_moments, n_gate_classes)  # Pass n_gate_classes here
         self.rules = rules
         self.reset()
 

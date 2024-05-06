@@ -19,7 +19,7 @@ agent = CircuitOptimizerAgent(N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES)
 ppo = PPO(agent, lr=LEARNING_RATE)
 
 # 创建模拟器环境
-env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES)
+env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES, N_GATE_CLASSES)
 action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS)
 
 def collect_episode_data(state, steps):
@@ -32,7 +32,7 @@ def collect_episode_data(state, steps):
             policy, value = agent(state.unsqueeze(0))  # 重新添加批次维度
             policy, value = agent(state.unsqueeze(0))
             policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)
-            masked_policy = policy * action_mask.mask(env.simulator.circuit)
+            masked_policy = policy * action_mask.mask(env.simulator.circuit,env.simulator.n_gate_classes)
             action_dist = Categorical(masked_policy.flatten())
             action = action_dist.sample()
             old_log_prob = action_dist.log_prob(action)
