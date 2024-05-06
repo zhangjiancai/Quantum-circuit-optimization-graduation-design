@@ -1,0 +1,10 @@
+# config.py
+
+# 配置参数
+N_QUBITS = 12
+N_MOMENTS = 50
+N_GATE_CLASSES = 4
+N_RULES = 6  # 规则的数量
+EPOCHS = 1000
+STEPS_PER_EPOCH = 600
+LEARNING_RATE = 3e-4

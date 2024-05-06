@@ -42,15 +42,16 @@ class QuantumCircuitSimulator:
     def get_gate_type(self, gate):
         """获取门类型的索引。"""
         gate_types = ['RZ', 'PX', 'CNOT', 'SWAP']
-        if isinstance(gate, cirq.RzPowGate):
+        if isinstance(gate, cirq.ops.ZPowGate):
             return gate_types.index('RZ')
-        if isinstance(gate, cirq.XPowGate):
+        if isinstance(gate, cirq.ops.XPowGate):
             return gate_types.index('PX')
-        if isinstance(gate, cirq.CNotPowGate):
+        if isinstance(gate, cirq.ops.CNotPowGate):
             return gate_types.index('CNOT')
-        if isinstance(gate, cirq.SwapPowGate):
+        if isinstance(gate, cirq.ops.SwapPowGate):
             return gate_types.index('SWAP')
         return None
+
     def apply_rule(self, rule):
         """Apply a transformation rule to the circuit."""
         rule(self)
@@ -81,7 +82,7 @@ class QuantumCircuitEnvironment:
         :param rules: List of transformation rules applicable to the circuit.
         :param n_gate_classes: Number of distinct gate classes considered in the simulation.
         """
-        self.simulator = QuantumCircuitSimulator(n_qubits, n_moments, n_gate_classes)  # Pass n_gate_classes here
+        self.simulator = QuantumCircuitSimulator(n_qubits, n_moments, n_gate_classes)
         self.rules = rules
         self.reset()
 
@@ -97,6 +98,7 @@ class QuantumCircuitEnvironment:
         state, reward, done = self.simulator.apply_rule(rule)
         self.done = done
         return state, reward, self.done
+
 class ActionMask:
     """Helper class for masking illegal actions."""
     def __init__(self, n_rules, n_qubits, n_moments):
@@ -104,8 +106,54 @@ class ActionMask:
         self.n_qubits = n_qubits
         self.n_moments = n_moments
 
-    def mask(self, circuit):
+    def mask(self, circuit, gate_classes):
         """Compute the action mask based on the current circuit state."""
-        mask = np.ones((self.n_rules, self.n_qubits * self.n_moments), dtype=np.bool)
+        mask = np.ones((self.n_rules, self.n_qubits * self.n_moments), dtype=bool)  # 使用Python内置的bool类型
         # Implement masking logic based on valid circuit transformation rules
         return torch.tensor(mask, dtype=torch.float32)
+'''
+# 测试代码
+if __name__ == '__main__':
+    def rz_rule(simulator):
+        """Apply RZ gate to the first qubit."""
+        qubits = simulator.qubits
+        gate = cirq.rz(np.pi / 2)
+        simulator.add_gate(gate, (qubits[0],))
+        return simulator
+
+    def x_rule(simulator):
+        """Apply X gate to the first qubit."""
+        qubits = simulator.qubits
+        gate = cirq.X
+        simulator.add_gate(gate, (qubits[0],))
+        return simulator
+
+    def cnot_rule(simulator):
+        """Apply CNOT gate between the first and second qubits."""
+        qubits = simulator.qubits
+        gate = cirq.CNOT
+        simulator.add_gate(gate, (qubits[0], qubits[1]))
+        return simulator
+
+    def swap_rule(simulator):
+        """Apply SWAP gate between the first and second qubits."""
+        qubits = simulator.qubits
+        gate = cirq.SWAP
+        simulator.add_gate(gate, (qubits[0], qubits[1]))
+        return simulator
+
+    RULES = [rz_rule, x_rule, cnot_rule, swap_rule]
+
+    n_qubits = 5
+    n_moments = 15
+    n_gate_classes = 4
+    env = QuantumCircuitEnvironment(n_qubits, n_moments, RULES, n_gate_classes)
+    action_mask = ActionMask(len(RULES), n_qubits, n_moments)
+
+    state = env.reset()
+    print(f"Initial State Shape: {state.shape}")
+
+    # 应用一个规则
+    new_state, reward, done = env.apply_rule(0)
+    print(f"State After Applying RZ Rule: {new_state.shape}, Reward: {reward}, Done: {done}")
+'''
