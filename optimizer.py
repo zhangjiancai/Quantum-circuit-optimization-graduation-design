@@ -7,7 +7,7 @@ from torch.distributions import Categorical
 
 class PPO:
     """Proximal Policy Optimization (PPO) Algorithm."""
-    def __init__(self, agent, lr=3e-4, gamma=0.99, clip_epsilon=0.2):
+    def __init__(self, agent, lr, gamma=0.99, clip_epsilon=0.2):
         """
         Initialize the PPO algorithm.
 
@@ -31,6 +31,8 @@ class PPO:
         surr1 = ratio * advantages
         surr2 = torch.clamp(ratio, 1.0 - self.clip_epsilon, 1.0 + self.clip_epsilon) * advantages
         policy_loss = -torch.min(surr1, surr2).mean()
+        #returns = returns.sum(dim=1, keepdim=True)
+        #new_values_aggregated = values.sum(dim=1, keepdim=True)
         value_loss = F.mse_loss(values, returns)
 
         loss = policy_loss + 0.5 * value_loss - 0.01 * policy.mean()
@@ -40,7 +42,8 @@ class PPO:
 
     def compute_advantages(self, rewards, dones, values):
         """Compute advantages using rewards and values。"""
-        returns = []
+        #returns = []
+        returns = torch.zeros_like(values, dtype=torch.float32)
         advantage = 0
 
         # 扩展 values 以包含最后一个元素
@@ -49,8 +52,9 @@ class PPO:
         for i in reversed(range(len(rewards))):
             mask = ~dones[i]  # 使用布尔值取反
             advantage = rewards[i] + self.gamma * values[i + 1] * mask - values[i]
-            returns.append(advantage)
-        returns = torch.tensor(list(reversed(returns)), dtype=torch.float32)
+            #returns.append(advantage)
+            returns[i] = advantage
+        #returns = torch.tensor(list(reversed(returns)), dtype=torch.float32)
         advantages = returns - values[:-1]
         return returns, advantages
     def compute_log_probs(self, policy, actions):
