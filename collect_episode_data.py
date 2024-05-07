@@ -1,20 +1,25 @@
+# collect_episode_data.py
+
 import torch
 from torch.distributions import Categorical
-import logging
 from agent import CircuitOptimizerAgent
 from environment import QuantumCircuitEnvironment, ActionMask
 from rules import RULES
 from config import N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES, N_STEPS
 
-# 设置日志配置
-logging.basicConfig(level=logging.INFO)
 
-# 加载强化学习代理
-agent = CircuitOptimizerAgent(N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES)
+class NoAvailableActionError(Exception):
+    """自定义异常，表示没有可用的动作。"""
+    pass
 
-# 创建模拟器环境
-env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES, N_GATE_CLASSES)
-action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS)
+
+def _choose_random_action(allowed_indices):
+    """从允许的动作中随机选择一个。"""
+    if len(allowed_indices) == 0:
+        raise NoAvailableActionError("没有可用的动作。")
+    random_index = torch.randint(low=0, high=len(allowed_indices), size=(1,))
+    return allowed_indices[random_index]
+
 
 def select_action(state, masked_policy, action_mask, env, n_gate_classes):
     """
@@ -35,23 +40,18 @@ def select_action(state, masked_policy, action_mask, env, n_gate_classes):
         # 如果所有动作都被禁止，随机选择一个允许的动作
         if masked_policy.sum() == 0:
             allowed_indices = torch.nonzero(action_mask.mask(env.simulator.circuit, n_gate_classes)).flatten()
-            if len(allowed_indices) > 0:
-                random_index = torch.randint(low=0, high=len(allowed_indices), size=(1,))
-                action = allowed_indices[random_index]
-            else:
-                #raise ValueError("没有可用的动作。")
-                old_log_prob = torch.tensor(0.0)
-                action = torch.tensor(0)  # 或者选择其他合适的默认处理方式
+            action, old_log_prob = _choose_random_action(allowed_indices)
         else:
             action_dist = Categorical(masked_policy.view(-1))
             action = action_dist.sample()
             old_log_prob = action_dist.log_prob(action)
 
-        logging.debug(f"选择的动作：{action.item()}，对数概率：{old_log_prob.item()}")
         return action, old_log_prob
-    except Exception as e:
-        logging.error(f"选择动作时出错：{e}")
+    except NoAvailableActionError as e:
         raise
+    except Exception as e:
+        raise
+
 
 def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
     """
@@ -84,72 +84,62 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
         state = env.reset().squeeze(0)
 
         while step_count < max_steps:
-            try:
-                with torch.no_grad():
-                    policy, value = agent(state.unsqueeze(0))
-                    policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)
+            with torch.no_grad():
+                policy, value = agent(state.unsqueeze(0))#调用智能体（agent）的模型，输入当前状态（unsqueeze增加一维以适应模型），得到策略向量（policy）和状态值（value）。
+                policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)#将策略张量重塑为特定的规则数（N_RULES）和量子比特与时刻的乘积（N_QUBITS * N_MOMENTS），以便后续处理。
 
-                    # 应用动作屏蔽
-                    masked_policy = policy * action_mask.mask(env.simulator.circuit, N_GATE_CLASSES)
-                    action, old_log_prob = select_action(state, masked_policy, action_mask, env, N_GATE_CLASSES)
+                # 应用动作屏蔽
+                masked_policy = policy * action_mask.mask(env.simulator.circuit, N_GATE_CLASSES)
+                action, old_log_prob = select_action(state, masked_policy, action_mask, env, N_GATE_CLASSES)
 
-                next_state, reward, done = env.apply_rule(action.item())
-                state = next_state
+            next_state, reward, done = env.apply_rule(action.item())
+            state = next_state
 
-                # 填充数据
-                states[step_count] = state.unsqueeze(0)
-                actions[step_count] = action
-                rewards[step_count] = reward
-                dones[step_count] = done
-                old_log_probs[step_count] = old_log_prob
-                values[step_count] = value
+            # 填充数据
+            states[step_count] = state.unsqueeze(0)
+            actions[step_count] = action
+            rewards[step_count] = reward
+            dones[step_count] = done
+            old_log_probs[step_count] = old_log_prob
+            values[step_count] = value
 
-                step_count += 1
-                if done:
-                    break
-
-            except Exception as e:
-                logging.error(f"在第 {step_count} 步的集内出错：{e}")
-                break  # 出错时退出循环
+            step_count += 1
+            if done:
+                break
 
         # 截断未使用的部分
         if step_count < max_steps:
-            logging.warning(f"集在最大步数前结束：{step_count}/{max_steps}")
-        states = states[:step_count]
-        actions = actions[:step_count]
-        rewards = rewards[:step_count]
-        dones = dones[:step_count]
-        old_log_probs = old_log_probs[:step_count]
-        values = values[:step_count]
+            states = states[:step_count]
+            actions = actions[:step_count]
+            rewards = rewards[:step_count]
+            dones = dones[:step_count]
+            old_log_probs = old_log_probs[:step_count]
+            values = values[:step_count]
 
         return states, actions, rewards, dones, old_log_probs, values
 
     except Exception as e:
-        logging.error(f"在 collect_episode_data 中出错：{e}")
         raise
 
+
 if __name__ == "__main__":
-    logging.info("收集集数据测试开始")
+    agent = CircuitOptimizerAgent(N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES)
 
     # 初始化环境并重置状态
     env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES, N_GATE_CLASSES)
     action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS)
     initial_state = env.reset()
 
-    try:
-        # 收集训练数据
-        states, actions, rewards, dones, old_log_probs, values = collect_episode_data(
-            agent, env, action_mask, max_steps=N_STEPS
-        )
+    # 收集训练数据
+    states, actions, rewards, dones, old_log_probs, values = collect_episode_data(
+        agent, env, action_mask, max_steps=N_STEPS
+    )
 
-        # 记录测试结果
-        logging.info("收集集数据测试完成")
-        logging.info(f"状态维度：{states.shape}")
-        logging.info(f"动作维度：{actions.shape}")
-        logging.info(f"奖励：{rewards}")
-        logging.info(f"集结束标志：{dones}")
-        logging.info(f"旧的对数概率：{old_log_probs}")
-        logging.info(f"价值预测：{values}")
-
-    except Exception as e:
-        logging.error(f"主进程中出错：{e}")
+    # 记录测试结果
+    print("收集集数据测试完成")
+    print(f"状态维度：{states.shape}")
+    print(f"动作维度：{actions.shape}")
+    print(f"奖励：{rewards}")
+    print(f"集结束标志：{dones}")
+    print(f"旧的对数概率：{old_log_probs}")
+    print(f"价值预测：{values}")

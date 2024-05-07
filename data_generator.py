@@ -1,3 +1,5 @@
+# \data_generator.py
+
 import numpy as np
 
 def generate_random_circuits(n_samples, n_qubits, n_gates, gate_classes):
