@@ -16,7 +16,7 @@ def _choose_random_action(allowed_indices):
     if len(allowed_indices) == 0:
         raise NoAvailableActionError("没有可用的动作。")
     random_index = torch.randint(low=0, high=len(allowed_indices), size=(1,))
-    return allowed_indices[random_index]
+    return allowed_indices[random_index].item()
 
 
 def select_action(state, masked_policy, action_mask, env, n_gate_classes):
@@ -31,21 +31,22 @@ def select_action(state, masked_policy, action_mask, env, n_gate_classes):
         n_gate_classes (int): 门类数。
 
     返回：
-        action (Tensor): 选择的动作索引。
+        action (tuple): 选择的动作索引 (rule_index, qubit_moment_index)。
         old_log_prob (Tensor): 选择动作的对数概率。
     """
     try:
         # 如果所有动作都被禁止，随机选择一个允许的动作
         if masked_policy.sum() == 0:
             allowed_indices = torch.nonzero(action_mask.mask(env.simulator.circuit, n_gate_classes)).flatten()
-            action, old_log_prob = _choose_random_action(allowed_indices)
+            action_index = _choose_random_action(allowed_indices)
+            old_log_prob = torch.tensor(0.0)
         else:
             action_dist = Categorical(masked_policy.view(-1))
             action = action_dist.sample()
             old_log_prob = action_dist.log_prob(action)
+            action_index = action.item()
 
         # 解析动作索引为 (rule, qubit, moment) 三元组
-        action_index = action.item()
         rule_index = action_index // (env.simulator.n_qubits * env.simulator.n_moments)
         qubit_moment_index = action_index % (env.simulator.n_qubits * env.simulator.n_moments)
         if not (0 <= rule_index < len(env.rules)):
@@ -77,8 +78,11 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
         values (Tensor): 代理做出的价值预测。
     """
     try:
+        # 获取状态张量的形状，并移除批次维度
+        state_shape = env.simulator.get_state().shape[1:]
+
         # 初始化数据容器
-        states = torch.empty((max_steps,) + env.simulator.get_state().shape, dtype=torch.float32)
+        states = torch.empty((max_steps,) + state_shape, dtype=torch.float32)
         actions = torch.empty(max_steps, 2, dtype=torch.int64)  # (rule_index, qubit_moment_index)
         rewards = torch.empty(max_steps, dtype=torch.float32)
         dones = torch.empty(max_steps, dtype=torch.bool)
@@ -90,8 +94,8 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
 
         while step_count < max_steps:
             with torch.no_grad():
-                policy, value = agent(state)  # 调用智能体（agent）的模型，输入当前状态，得到策略向量（policy）和状态值（value）。
-                policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)  # 将策略张量重塑为特定的规则数（N_RULES）和量子比特与时刻的乘积（N_QUBITS * N_MOMENTS），以便后续处理。
+                policy, value = agent(state)  # 确保输入为4维：[batch_size, channels, height, width]
+                policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)  # 将策略张量重塑为特定的规则数和量子比特与时刻的乘积
 
                 # 应用动作屏蔽
                 masked_policy = policy * action_mask.mask(env.simulator.circuit, N_GATE_CLASSES)
@@ -124,6 +128,7 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
         return states, actions, rewards, dones, old_log_probs, values
 
     except Exception as e:
+        print(f"An error occurred during data collection: {e}")
         raise
 
 '''
@@ -141,7 +146,7 @@ if __name__ == "__main__":
     )
 
     # 记录测试结果
-    print("收集集数据测试完成")
+    print("收集数据测试完成")
     print(f"状态维度：{states.shape}")
     print(f"动作维度：{actions.shape}")
     print(f"奖励：{rewards}")
