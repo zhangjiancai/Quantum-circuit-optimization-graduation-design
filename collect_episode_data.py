@@ -126,7 +126,7 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
     except Exception as e:
         raise
 
-
+'''
 if __name__ == "__main__":
     agent = CircuitOptimizerAgent(N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES)
 
@@ -148,3 +148,4 @@ if __name__ == "__main__":
     print(f"集结束标志：{dones}")
     print(f"旧的对数概率：{old_log_probs}")
     print(f"价值预测：{values}")
+'''

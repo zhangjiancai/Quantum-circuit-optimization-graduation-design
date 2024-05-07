@@ -44,11 +44,11 @@ def cancel_adjacent_rz(simulator):
     """Cancel adjacent RZ gates if their angles sum to zero."""
     new_ops = []
     for op in simulator.circuit.all_operations():
-        if not new_ops or not isinstance(op.gate, cirq.ops.common_gates.RzPowGate):
+        if not new_ops or not isinstance(op.gate, cirq.ZPowGate):
             new_ops.append(op)
         else:
             prev_op = new_ops.pop()
-            if isinstance(prev_op.gate, cirq.ops.common_gates.RzPowGate):
+            if isinstance(prev_op.gate, cirq.ZPowGate):
                 angle_sum = prev_op.gate._exponent + op.gate._exponent
                 if np.isclose(angle_sum % 2, 0):
                     continue  # Cancel out
