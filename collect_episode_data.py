@@ -1,5 +1,3 @@
-# collect_episode_data.py
-
 import torch
 from torch.distributions import Categorical
 from agent import CircuitOptimizerAgent
@@ -46,7 +44,14 @@ def select_action(state, masked_policy, action_mask, env, n_gate_classes):
             action = action_dist.sample()
             old_log_prob = action_dist.log_prob(action)
 
-        return action, old_log_prob
+        # 解析动作索引为 (rule, qubit, moment) 三元组
+        action_index = action.item()
+        rule_index = action_index // (env.simulator.n_qubits * env.simulator.n_moments)
+        qubit_moment_index = action_index % (env.simulator.n_qubits * env.simulator.n_moments)
+        if not (0 <= rule_index < len(env.rules)):
+            raise IndexError(f"Selected rule index {rule_index} is out of range. Valid range is [0, {len(env.rules) - 1}].")
+
+        return (rule_index, qubit_moment_index), old_log_prob
     except NoAvailableActionError as e:
         raise
     except Exception as e:
@@ -74,7 +79,7 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
     try:
         # 初始化数据容器
         states = torch.empty((max_steps, 1) + env.simulator.get_state().shape[1:], dtype=torch.float32)
-        actions = torch.empty(max_steps, dtype=torch.int64)
+        actions = torch.empty(max_steps, 2, dtype=torch.int64)  # (rule_index, qubit_moment_index)
         rewards = torch.empty(max_steps, dtype=torch.float32)
         dones = torch.empty(max_steps, dtype=torch.bool)
         old_log_probs = torch.empty(max_steps, dtype=torch.float32)
@@ -85,19 +90,19 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
 
         while step_count < max_steps:
             with torch.no_grad():
-                policy, value = agent(state.unsqueeze(0))#调用智能体（agent）的模型，输入当前状态（unsqueeze增加一维以适应模型），得到策略向量（policy）和状态值（value）。
-                policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)#将策略张量重塑为特定的规则数（N_RULES）和量子比特与时刻的乘积（N_QUBITS * N_MOMENTS），以便后续处理。
+                policy, value = agent(state.unsqueeze(0))  # 调用智能体（agent）的模型，输入当前状态（unsqueeze增加一维以适应模型），得到策略向量（policy）和状态值（value）。
+                policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)  # 将策略张量重塑为特定的规则数（N_RULES）和量子比特与时刻的乘积（N_QUBITS * N_MOMENTS），以便后续处理。
 
                 # 应用动作屏蔽
                 masked_policy = policy * action_mask.mask(env.simulator.circuit, N_GATE_CLASSES)
                 action, old_log_prob = select_action(state, masked_policy, action_mask, env, N_GATE_CLASSES)
 
-            next_state, reward, done = env.apply_rule(action.item())
+            next_state, reward, done = env.apply_rule(action)
             state = next_state
 
             # 填充数据
             states[step_count] = state.unsqueeze(0)
-            actions[step_count] = action
+            actions[step_count] = torch.tensor(action)
             rewards[step_count] = reward
             dones[step_count] = done
             old_log_probs[step_count] = old_log_prob

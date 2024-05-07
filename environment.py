@@ -94,8 +94,11 @@ class QuantumCircuitEnvironment:
         self.done = False
         return self.state
 
-    def apply_rule(self, rule_index):
+    def apply_rule(self, action):
         """Apply circuit transformation rule."""
+        rule_index, _ = action  # 解包元组
+        if not (0 <= rule_index < len(self.rules)):
+            raise IndexError(f"Rule index {rule_index} is out of range. Valid range is [0, {len(self.rules) - 1}].")
         rule = self.rules[rule_index]
         state, reward, done = self.simulator.apply_rule(rule)
         self.done = done
