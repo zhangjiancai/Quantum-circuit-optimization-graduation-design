@@ -22,7 +22,7 @@ action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS)
 for epoch in trange(EPOCHS, desc="Epoch"):
     try:
         # 在每个epoch开始时重置环境
-        states, actions, rewards, dones, old_log_probs, values = collect_episode_data(None, STEPS_PER_EPOCH, action_mask, env)
+        states, actions, rewards, dones, old_log_probs, values = collect_episode_data(agent, env, action_mask, max_steps=STEPS_PER_EPOCH)
         
         # 将数据按步骤划分并批量更新模型
         for step in range(STEPS_PER_EPOCH):
