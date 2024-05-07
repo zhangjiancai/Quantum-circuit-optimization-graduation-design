@@ -78,7 +78,7 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
     """
     try:
         # 初始化数据容器
-        states = torch.empty((max_steps, 1) + env.simulator.get_state().shape[1:], dtype=torch.float32)
+        states = torch.empty((max_steps,) + env.simulator.get_state().shape, dtype=torch.float32)
         actions = torch.empty(max_steps, 2, dtype=torch.int64)  # (rule_index, qubit_moment_index)
         rewards = torch.empty(max_steps, dtype=torch.float32)
         dones = torch.empty(max_steps, dtype=torch.bool)
@@ -86,11 +86,11 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
         values = torch.empty(max_steps, dtype=torch.float32)
 
         step_count = 0
-        state = env.reset().squeeze(0)
+        state = env.reset()
 
         while step_count < max_steps:
             with torch.no_grad():
-                policy, value = agent(state.unsqueeze(0))  # 调用智能体（agent）的模型，输入当前状态（unsqueeze增加一维以适应模型），得到策略向量（policy）和状态值（value）。
+                policy, value = agent(state)  # 调用智能体（agent）的模型，输入当前状态，得到策略向量（policy）和状态值（value）。
                 policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)  # 将策略张量重塑为特定的规则数（N_RULES）和量子比特与时刻的乘积（N_QUBITS * N_MOMENTS），以便后续处理。
 
                 # 应用动作屏蔽
@@ -101,7 +101,7 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
             state = next_state
 
             # 填充数据
-            states[step_count] = state.unsqueeze(0)
+            states[step_count] = state
             actions[step_count] = torch.tensor(action)
             rewards[step_count] = reward
             dones[step_count] = done
