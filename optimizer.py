@@ -39,17 +39,20 @@ class PPO:
         self.optimizer.step()
 
     def compute_advantages(self, rewards, dones, values):
-        """Compute advantages using rewards and values."""
+        """Compute advantages using rewards and values。"""
         returns = []
         advantage = 0
+
+        # 扩展 values 以包含最后一个元素
+        values = torch.cat((values, torch.tensor([values[-1]])))
+
         for i in reversed(range(len(rewards))):
-            mask = 1 - dones[i]
+            mask = ~dones[i]  # 使用布尔值取反
             advantage = rewards[i] + self.gamma * values[i + 1] * mask - values[i]
             returns.append(advantage)
         returns = torch.tensor(list(reversed(returns)), dtype=torch.float32)
         advantages = returns - values[:-1]
         return returns, advantages
-
     def compute_log_probs(self, policy, actions):
         """Compute log probabilities of the selected actions."""
         dist = Categorical(policy)
