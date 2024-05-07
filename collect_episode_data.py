@@ -1,3 +1,4 @@
+# 引入所需的库和模块
 import torch
 from torch.distributions import Categorical
 from agent import CircuitOptimizerAgent
@@ -12,13 +13,22 @@ class NoAvailableActionError(Exception):
 
 
 def _choose_random_action(allowed_indices):
-    """从允许的动作中随机选择一个。"""
+    """
+    从允许的动作中随机选择一个。
+
+    参数：
+        allowed_indices (Tensor): 允许的动作索引集合。
+
+    返回：
+        action_index (int): 随机选择的动作索引。
+    """
     if len(allowed_indices) == 0:
         raise NoAvailableActionError("没有可用的动作。")
     random_index = torch.randint(low=0, high=len(allowed_indices), size=(1,))
     return allowed_indices[random_index].item()
 
 
+# collect_episode_data.py
 def select_action(state, masked_policy, action_mask, env, n_gate_classes):
     """
     选择动作的逻辑，包括处理被屏蔽的动作。
@@ -35,27 +45,30 @@ def select_action(state, masked_policy, action_mask, env, n_gate_classes):
         old_log_prob (Tensor): 选择动作的对数概率。
     """
     try:
-        # 如果所有动作都被禁止，随机选择一个允许的动作
+        masked_policy = masked_policy.view(-1)
         if masked_policy.sum() == 0:
+            # 如果所有动作都被屏蔽，则随机选择一个允许的动作
             allowed_indices = torch.nonzero(action_mask.mask(env.simulator.circuit, n_gate_classes)).flatten()
             action_index = _choose_random_action(allowed_indices)
             old_log_prob = torch.tensor(0.0)
         else:
-            action_dist = Categorical(masked_policy.view(-1))
+            # 从非屏蔽的动作中选择一个动作
+            action_dist = Categorical(masked_policy)
             action = action_dist.sample()
             old_log_prob = action_dist.log_prob(action)
             action_index = action.item()
 
-        # 解析动作索引为 (rule, qubit, moment) 三元组
+        # 计算动作对应的规则索引和量子比特-时刻索引
         rule_index = action_index // (env.simulator.n_qubits * env.simulator.n_moments)
         qubit_moment_index = action_index % (env.simulator.n_qubits * env.simulator.n_moments)
+        # 确保选择的规则索引在有效范围内
         if not (0 <= rule_index < len(env.rules)):
             raise IndexError(f"Selected rule index {rule_index} is out of range. Valid range is [0, {len(env.rules) - 1}].")
 
         return (rule_index, qubit_moment_index), old_log_prob
-    except NoAvailableActionError as e:
-        raise
+
     except Exception as e:
+        print(f"An error occurred during action selection: {e}")
         raise
 
 
@@ -94,17 +107,19 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
 
         while step_count < max_steps:
             with torch.no_grad():
-                policy, value = agent(state)  # 确保输入为4维：[batch_size, channels, height, width]
-                policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)  # 将策略张量重塑为特定的规则数和量子比特与时刻的乘积
+                # 代理根据当前状态做出策略和价值预测
+                policy, value = agent(state)  
+                policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)  
 
                 # 应用动作屏蔽
                 masked_policy = policy * action_mask.mask(env.simulator.circuit, N_GATE_CLASSES)
                 action, old_log_prob = select_action(state, masked_policy, action_mask, env, N_GATE_CLASSES)
 
+            # 环境根据选择的动作更新状态，并返回奖励
             next_state, reward, done = env.apply_rule(action)
             state = next_state
 
-            # 填充数据
+            # 填充收集到的数据
             states[step_count] = state
             actions[step_count] = torch.tensor(action)
             rewards[step_count] = reward
@@ -130,7 +145,6 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
     except Exception as e:
         print(f"An error occurred during data collection: {e}")
         raise
-
 '''
 if __name__ == "__main__":
     agent = CircuitOptimizerAgent(N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES)

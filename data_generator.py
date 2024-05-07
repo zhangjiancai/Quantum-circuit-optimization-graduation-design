@@ -1,36 +1,40 @@
 # \data_generator.py
 
 import numpy as np
+import torch
 
-def generate_random_circuits(n_samples, n_qubits, n_gates, gate_classes):
-    circuits = []
-    for _ in range(n_samples):
-        circuit = np.zeros((n_qubits, n_gates, len(gate_classes)), dtype=np.int32)
-        for _ in range(n_gates):
-            qubit = np.random.randint(0, n_qubits)
-            gate_class = np.random.randint(0, len(gate_classes))
-            moment = np.random.randint(0, n_gates)
-            circuit[qubit, moment, gate_class] = 1
-        circuits.append(circuit)
-    return circuits
+class DataGenerator:
+    def __init__(self, env, params):
+        self.env = env
+        self.params = params
+
+    def generate_data(self, batch_size):
+        inputs, targets = [], []
+        for _ in range(batch_size):
+            state = self.env.reset()
+            action = self.env.sample_action()
+            next_state, reward, done = self.env.step(action)
+
+            # 确保目标维度与网络输出一致
+            targets.append([reward, done, 0, 0])
+            inputs.append(state)
+
+        return torch.tensor(inputs, dtype=torch.float32), torch.tensor(targets, dtype=torch.float32)
 '''
-# Example usage
-n_samples = 100
-n_qubits = 12
-n_gates = 50
-gate_classes = ['RZ', 'PX', 'CNOT']
-random_circuits = generate_random_circuits(n_samples, n_qubits, n_gates, gate_classes)
-# 测试代码
-if __name__ == '__main__':
-    n_samples = 100
-    n_qubits = 12
-    n_gates = 50
-    gate_classes = ['RZ', 'PX', 'CNOT']
-    
-    random_circuits = generate_random_circuits(n_samples, n_qubits, n_gates, gate_classes)
-    
-    # 输出部分结果
-    print(f"Generated {len(random_circuits)} circuits.")
-    print(f"Example Circuit Shape: {random_circuits[0].shape}")
-    print(f"Example Circuit Data (first circuit): {random_circuits[0]}")
+import torch.nn as nn
+import torch
+
+class SimpleNetwork(nn.Module):
+    def __init__(self):
+        super(SimpleNetwork, self).__init__()
+        self.fc = nn.Linear(4, 4)  # 假设输入和输出维度均为 4
+
+    def forward(self, x):
+        return self.fc(x)
+
+# 测试模型
+model = SimpleNetwork()
+input_tensor = torch.rand((1, 4))  # 假设输入维度是 [1, 4]
+output = model(input_tensor)
+print(output.shape)  # 输出维度应当是 [1, 4]
 '''

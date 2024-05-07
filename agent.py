@@ -1,4 +1,4 @@
-# \agent.py
+# agent.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -18,6 +18,7 @@ class CircuitOptimizerAgent(nn.Module):
         super(CircuitOptimizerAgent, self).__init__()
         self.n_qubits = n_qubits
         self.n_moments = n_moments
+        self.n_rules = n_rules  # 将 n_rules 作为属性存储
 
         # 卷积层
         self.conv1 = nn.Conv2d(n_gate_classes, 64, kernel_size=3, padding=1)
@@ -35,7 +36,7 @@ class CircuitOptimizerAgent(nn.Module):
         flattened_size = 256 * qubits_out * moments_out
 
         # 策略网络的全连接层
-        self.policy_linear = nn.Linear(flattened_size, n_qubits * n_moments * n_rules)
+        self.policy_linear = nn.Linear(flattened_size, n_rules * n_qubits * n_moments)
 
         # 价值网络的全连接层
         self.value_linear = nn.Linear(flattened_size, 1)
@@ -52,6 +53,7 @@ class CircuitOptimizerAgent(nn.Module):
 
         # 策略网络
         policy = self.policy_linear(x_flat)
+        policy = policy.view(-1, self.n_rules, self.n_qubits * self.n_moments)  # 修正此处的维度
         policy = F.softmax(policy, dim=-1)
 
         # 价值网络
@@ -59,20 +61,27 @@ class CircuitOptimizerAgent(nn.Module):
 
         return policy, value
 '''
-# 示例输入
-n_qubits = 5
-n_moments = 15
-n_gate_classes = 10  # 假设的门类别数
-n_rules = 8  # 假设的规则数量
+import unittest
+from torch.autograd import Variable
 
-# 创建一个 CircuitOptimizerAgent 实例
-model = CircuitOptimizerAgent(n_qubits, n_moments, n_gate_classes, n_rules)
+class TestCircuitOptimizerAgent(unittest.TestCase):
+    def setUp(self):
+        self.n_qubits = 3
+        self.n_moments = 4
+        self.n_gate_classes = 5
+        self.n_rules = 6
+        self.agent = CircuitOptimizerAgent(self.n_qubits, self.n_moments, self.n_gate_classes, self.n_rules)
 
-# 创建随机输入数据
-input_data = torch.randn(1, n_gate_classes, n_qubits, n_moments)  # Batch size 为 1
-policy, value = model(input_data)
+    def test_forward_output_shape(self):
+        batch_size = 7
+        input_shape = (batch_size, self.n_gate_classes, self.n_qubits, self.n_moments)
+        # 使用torch.randn生成随机张量
+        input_tensor = Variable(torch.randn(*input_shape), requires_grad=True)
+        policy, value = self.agent(input_tensor)
 
-# 输出形状
-print(f"Policy shape: {policy.shape}")
-print(f"Value shape: {value.shape}")
+        self.assertEqual(policy.shape, (batch_size, self.n_rules, self.n_qubits * self.n_moments))
+        self.assertEqual(value.shape, (batch_size, 1))
+
+if __name__ == '__main__':
+    unittest.main()
 '''
