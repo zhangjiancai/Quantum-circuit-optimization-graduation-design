@@ -31,6 +31,7 @@ while not done:
         policy, _ = agent(state.unsqueeze(0))
         policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)
         masked_policy = policy * action_mask.mask(env.simulator.circuit)
+        #action_dist = Categorical(masked_policy)
         action_dist = Categorical(masked_policy.flatten())
         action = action_dist.sample()
 

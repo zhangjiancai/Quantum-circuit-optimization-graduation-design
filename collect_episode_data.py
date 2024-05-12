@@ -113,6 +113,19 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
 
                 # 应用动作屏蔽
                 masked_policy = policy * action_mask.mask(env.simulator.circuit, N_GATE_CLASSES)
+
+                # 调整逻辑示例
+                # 确保掩码正确广播或调整形状
+                if action_mask.mask(env.simulator.circuit, N_GATE_CLASSES).ndim < policy.ndim:
+                    action_mask_adjusted = action_mask.mask(env.simulator.circuit, N_GATE_CLASSES).unsqueeze(0)  # 假设在批次维度上扩展
+                else:
+                    action_mask_adjusted = action_mask.mask(env.simulator.circuit, N_GATE_CLASSES)
+
+                masked_policy = policy * action_mask_adjusted
+
+                # 确认形状正确
+                assert masked_policy.shape == policy.shape, "Shapes do not match after masking."
+
                 action, old_log_prob = select_action(state, masked_policy, action_mask, env, N_GATE_CLASSES)
 
             # 环境根据选择的动作更新状态，并返回奖励
@@ -145,7 +158,7 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
     except Exception as e:
         print(f"An error occurred during data collection: {e}")
         raise
-'''
+
 if __name__ == "__main__":
     agent = CircuitOptimizerAgent(N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES)
 
@@ -167,4 +180,4 @@ if __name__ == "__main__":
     print(f"集结束标志：{dones}")
     print(f"旧的对数概率：{old_log_probs}")
     print(f"价值预测：{values}")
-'''
+

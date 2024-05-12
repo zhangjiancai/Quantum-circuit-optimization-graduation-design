@@ -61,11 +61,13 @@ class PPO:
 
         # 价值函数损失计算，考虑了裁剪以减少更新波动
         # 假设returns的原始形状是[batch_size, sequence_length]
-        returns = returns.sum(dim=1, keepdim=True)  # 累加sequence_length维度，添加keepdim保持二维结构
+        returns = returns.sum(dim=0)  # 累加sequence_length维度
+        returns = torch.tensor(returns, dtype=torch.float32).unsqueeze(0)  # 如果returns是Python标量，转换为张量并增加一维
         # 假设new_values的原始形状是[batch_size, sequence_length]
-        new_values_aggregated = new_values.sum(dim=1, keepdim=True)  # 累加sequence_length维度，保持二维结构
+        new_values_aggregated = new_values.sum(dim=0)  # 累加sequence_length维度
         value_loss = F.mse_loss(new_values_aggregated, returns)
-
+        # 修正 `value_loss` 计算
+        #value_loss = F.mse_loss(new_values.squeeze(), returns)
         # 计算策略熵，鼓励探索
         new_policy_normalized = F.softmax(new_policy, dim=-1)
         # 现在使用归一化后的概率分布来计算熵
@@ -157,7 +159,7 @@ def test_ppo():
     rewards = torch.tensor([1.0, 0.5, -0.5, 1.0, 2.0], dtype=torch.float32)
     dones = torch.tensor([0, 0, 0, 1, 1], dtype=torch.float32)
     old_log_probs = torch.tensor([-0.1, -0.2, -0.3, -0.4, -0.5], dtype=torch.float32)
-    values = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5, 0.6], dtype=torch.float32)
+    values = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5], dtype=torch.float32)  # 修正values的长度为5，与其它输入匹配
 
     # 更新代理模型
     ppo.update(states, actions, rewards, dones, old_log_probs, values)
@@ -171,5 +173,5 @@ def test_ppo():
     print(f"Old Log Probs: {old_log_probs}")
     print(f"Values: {values}")
 
-#if __name__ == '__main__':
-#    test_ppo()
+if __name__ == '__main__':
+    test_ppo()
