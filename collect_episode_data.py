@@ -160,26 +160,3 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
     except Exception as e:
         print(f"An error occurred during data collection: {e}")
         raise
-
-if __name__ == "__main__":
-    agent = CircuitOptimizerAgent(N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES)
-
-    # 初始化环境并重置状态
-    env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES, N_GATE_CLASSES)
-    action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS)
-    initial_state = env.reset()
-
-    # 收集训练数据
-    states, actions, rewards, dones, old_log_probs, values = collect_episode_data(
-        agent, env, action_mask, max_steps=N_STEPS
-    )
-
-    # 记录测试结果
-    print("收集数据测试完成")
-    print(f"状态维度：{states.shape}")
-    print(f"动作维度：{actions.shape}")
-    print(f"奖励：{rewards}")
-    print(f"集结束标志：{dones}")
-    print(f"旧的对数概率：{old_log_probs}")
-    print(f"价值预测：{values}")
-

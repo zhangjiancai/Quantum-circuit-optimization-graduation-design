@@ -64,28 +64,3 @@ class CircuitOptimizerAgent(nn.Module):
         value = self.value_linear(x_flat)
 
         return policy, value
-'''
-import unittest
-from torch.autograd import Variable
-
-class TestCircuitOptimizerAgent(unittest.TestCase):
-    def setUp(self):
-        self.n_qubits = 3
-        self.n_moments = 4
-        self.n_gate_classes = 5
-        self.n_rules = 6
-        self.agent = CircuitOptimizerAgent(self.n_qubits, self.n_moments, self.n_gate_classes, self.n_rules)
-
-    def test_forward_output_shape(self):
-        batch_size = 7
-        input_shape = (batch_size, self.n_gate_classes, self.n_qubits, self.n_moments)
-        # 使用torch.randn生成随机张量
-        input_tensor = Variable(torch.randn(*input_shape), requires_grad=True)
-        policy, value = self.agent(input_tensor)
-
-        self.assertEqual(policy.shape, (batch_size, self.n_rules, self.n_qubits * self.n_moments))
-        self.assertEqual(value.shape, (batch_size, 1))
-
-if __name__ == '__main__':
-    unittest.main()
-'''

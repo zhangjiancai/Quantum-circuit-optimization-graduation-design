@@ -62,22 +62,3 @@ def cancel_adjacent_rz(simulator):
     return simulator
 
 RULES = [rz_rule, x_rule, cnot_rule, swap_rule, commute_rule, cancel_adjacent_rz]
-'''
-# 测试规则
-if __name__ == '__main__':
-    from environment import QuantumCircuitSimulator
-
-    n_qubits = 5
-    n_moments = 15
-    n_gate_classes = 4
-
-    simulator = QuantumCircuitSimulator(n_qubits, n_moments, n_gate_classes)
-
-    # 测试应用 RZ 规则
-    state, reward, done = simulator.apply_rule(rz_rule)
-    print(f"State after applying RZ rule: {state.shape}, Reward: {reward}, Done: {done}")
-
-    # 测试应用 CNOT 规则
-    state, reward, done = simulator.apply_rule(cnot_rule)
-    print(f"State after applying CNOT rule: {state.shape}, Reward: {reward}, Done: {done}")
-'''
