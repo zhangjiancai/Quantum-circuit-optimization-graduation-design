@@ -62,7 +62,9 @@ class PPO:
         # 价值函数损失计算，考虑了裁剪以减少更新波动
         # 假设returns的原始形状是[batch_size, sequence_length]
         returns = returns.sum(dim=0)  # 累加sequence_length维度
-        returns = torch.tensor(returns, dtype=torch.float32).unsqueeze(0)  # 如果returns是Python标量，转换为张量并增加一维
+        #returns = torch.tensor(returns, dtype=torch.float32).unsqueeze(0)  # 如果returns是Python标量，转换为张量并增加一维
+        returns = returns.clone().detach().unsqueeze(0) #这段代码首先使用.clone()创建returns张量的一个副本，这样就断开了与原始计算图的连接。然后，使用.detach()确保新创建的张量不会跟踪任何历史梯度。最后，unsqueeze(0)用于在张量的最前面添加一个维度。这样，即使returns是一个标量，也能得到一个形状为(1, sequence_length)的张量。
+        
         # 假设new_values的原始形状是[batch_size, sequence_length]
         new_values_aggregated = new_values.sum(dim=0)  # 累加sequence_length维度
         value_loss = F.mse_loss(new_values_aggregated, returns)
@@ -112,33 +114,41 @@ class PPO:
         returns = advantages + values
         return returns, advantages
 
-    def compute_log_probs(self, policy_dist, actions):
+    def compute_log_probs(self,policy, actions):
         """
-        计算在给定动作分布下选择的动作的对数概率。
-
-        确保在传递给Categorical分布之前进行规范化。
+            计算在给定动作分布下选择的动作的对数概率。
+    
+        参数：
+            policy (torch.Tensor): 策略输出，形状为 [batch_size, n_rules, n_qubits * n_moments]
+            actions (torch.Tensor): 动作索引，形状为 [batch_size, 2]，其中包括规则索引和量子位时刻索引。
         """
-        # 计算未规范化概率
-        unnormalized_probs = torch.exp(policy_dist)
+        # 提取规则索引和量子位时刻索引
+        rule_indices = actions[:, 0]
+        qubit_moment_indices = actions[:, 1]
 
-        # 规范化概率以满足概率分布的约束
-        probs = unnormalized_probs / unnormalized_probs.sum(dim=-1, keepdim=True)
+        # 批次大小
+        batch_size = policy.shape[0]
 
-        # 处理可能出现的NaN或无穷大值
-        # 将它们设为0以避免数值问题
-        probs[torch.isnan(probs)] = 0.0
-        probs[probs == float('inf')] = 0.0
-        # 确保actions的形状正确
-        #if actions.dim() > 1:
-        #    actions = actions.squeeze()  # 假设只有一个维度需要被压缩
+        # 收集对应的概率
+        log_probs = torch.zeros(batch_size)
+        for i in range(batch_size):
+            # 获取单个样本的规则对应的概率分布
+            rule_prob = policy[i, rule_indices[i]]
 
-        # 创建Categorical分布对象并计算对数概率
-        dist = Categorical(probs=probs)
-        print("Probs shape:", probs.shape)  # 应该是[1, 4]
-        print("Actions shape:", actions.shape)  # 应该是[1]
-        print("Actions:", actions)
+            # 计算未规范化概率
+            unnormalized_probs = torch.exp(rule_prob)
 
-        log_probs = dist.log_prob(actions)  # 计算对数概率
+            # 规范化概率以满足概率分布的约束
+            probs = unnormalized_probs / unnormalized_probs.sum(dim=0, keepdim=True)
+
+            # 处理可能出现的NaN或无穷大值
+            probs[torch.isnan(probs)] = 0.0
+            probs[probs == float('inf')] = 0.0
+
+            # 创建Categorical分布对象并计算对数概率
+            dist = Categorical(probs=probs)
+            log_prob = dist.log_prob(qubit_moment_indices[i])
+            log_probs[i] = log_prob
 
         return log_probs
        
