@@ -1,4 +1,4 @@
-# evaluate.py
+# optimizer.py
 import os
 import torch
 import torch.nn as nn
@@ -128,9 +128,16 @@ class PPO:
         # 将它们设为0以避免数值问题
         probs[torch.isnan(probs)] = 0.0
         probs[probs == float('inf')] = 0.0
+        # 确保actions的形状正确
+        #if actions.dim() > 1:
+        #    actions = actions.squeeze()  # 假设只有一个维度需要被压缩
 
         # 创建Categorical分布对象并计算对数概率
         dist = Categorical(probs=probs)
+        print("Probs shape:", probs.shape)  # 应该是[1, 4]
+        print("Actions shape:", actions.shape)  # 应该是[1]
+        print("Actions:", actions)
+
         log_probs = dist.log_prob(actions)  # 计算对数概率
 
         return log_probs

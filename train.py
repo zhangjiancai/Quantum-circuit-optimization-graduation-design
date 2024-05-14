@@ -1,6 +1,7 @@
 # train.py
 
 import torch
+import traceback
 from torch.distributions import Categorical
 from agent import CircuitOptimizerAgent
 from environment import QuantumCircuitEnvironment, ActionMask
@@ -18,12 +19,16 @@ ppo = PPO(agent, lr=LEARNING_RATE)
 env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES, N_GATE_CLASSES)
 action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS)
 
+def check_tensor_format(tensor, expected_shape, name):
+    if not tensor.size() == expected_shape:
+        raise ValueError(f"{name} has an unexpected shape. Expected {expected_shape}, got {tensor.size()}.")
+    
 # 训练循环
 for epoch in trange(EPOCHS, desc="Epoch"):
     try:
         # 在每个epoch开始时重置环境
         states, actions, rewards, dones, old_log_probs, values = collect_episode_data(agent, env, action_mask, max_steps=STEPS_PER_EPOCH)
-        
+        check_tensor_format(actions, (STEPS_PER_EPOCH,2), "Actions")
         # 将数据按步骤划分并批量更新模型
         for step in range(STEPS_PER_EPOCH):
             batch_states = states[step::STEPS_PER_EPOCH]
@@ -36,7 +41,16 @@ for epoch in trange(EPOCHS, desc="Epoch"):
             ppo.update(batch_states, batch_actions, batch_rewards, batch_dones, batch_old_log_probs, batch_values)
 
     except Exception as e:
-        print(f"An error occurred during training: {e}")
+        # 获取详细的错误信息和堆栈跟踪
+        error_message = f"""
+        An error occurred during training:
+        Error Type: {type(e).__name__}
+        Description: {e}
+    
+        Traceback:
+        {traceback.format_exc()}
+        """
+        print(error_message)
 
     print(f"Epoch {epoch + 1}/{EPOCHS} complete.")
 

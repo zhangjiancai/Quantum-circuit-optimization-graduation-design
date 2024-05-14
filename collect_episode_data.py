@@ -1,4 +1,4 @@
-# 引入所需的库和模块
+# collect_episode_data.py
 import torch
 from torch.distributions import Categorical
 from agent import CircuitOptimizerAgent
@@ -28,7 +28,7 @@ def _choose_random_action(allowed_indices):
     return allowed_indices[random_index].item()
 
 
-# collect_episode_data.py
+
 def select_action(state, masked_policy, action_mask, env, n_gate_classes):
     """
     选择动作的逻辑，包括处理被屏蔽的动作。
@@ -97,6 +97,8 @@ def collect_episode_data(agent, env, action_mask, max_steps=N_STEPS):
         # 初始化数据容器
         states = torch.empty((max_steps,) + state_shape, dtype=torch.float32)
         actions = torch.empty(max_steps, 2, dtype=torch.int64)  # (rule_index, qubit_moment_index)
+        #rule_index：这个索引代表了选择的变换规则，如合并两个连续的反向操作，或者交换两个可交换的操作。
+        #qubit_moment_index：这个索引指定了变换应用于电路中的具体位置，通常与特定的量子位和时刻相关联。
         rewards = torch.empty(max_steps, dtype=torch.float32)
         dones = torch.empty(max_steps, dtype=torch.bool)
         old_log_probs = torch.empty(max_steps, dtype=torch.float32)
