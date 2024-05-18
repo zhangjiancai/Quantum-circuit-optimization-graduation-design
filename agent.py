@@ -25,14 +25,11 @@ class CircuitOptimizerAgent(nn.Module):
         self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
         self.conv4 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.bn = nn.BatchNorm2d(256)  # 将批归一化层移到这里初始化
 
         # 计算展平后的特征大小
-        def conv_output_size(size, kernel_size=3, stride=1, padding=1):
-            return ((size - kernel_size + 2 * padding) // stride) + 1
-
-        qubits_out = conv_output_size(conv_output_size(conv_output_size(conv_output_size(self.n_qubits))))
-        moments_out = conv_output_size(conv_output_size(conv_output_size(conv_output_size(self.n_moments))))
-
+        qubits_out = self.conv_output_size(self.n_qubits)
+        moments_out = self.conv_output_size(self.n_moments)
         flattened_size = 256 * qubits_out * moments_out
 
         # 策略网络的全连接层
@@ -40,6 +37,10 @@ class CircuitOptimizerAgent(nn.Module):
 
         # 价值网络的全连接层
         self.value_linear = nn.Linear(flattened_size, 1)
+        
+
+    def conv_output_size(self, size, kernel_size=3, stride=1, padding=1):        # 计算展平后的特征大小
+        return ((size - kernel_size + 2 * padding) // stride) + 1
 
     def forward(self, x):
         """前向传播。"""

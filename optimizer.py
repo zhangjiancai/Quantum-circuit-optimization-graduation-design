@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
-
+from config import LEARNING_RATE, EPOCHS, STEPS_PER_EPOCH,gamma,clip_epsilon
 # 定义PPO类，实现近端策略优化算法
 
 class PPO:
@@ -14,7 +14,7 @@ class PPO:
     一种强化学习算法，通过信任区域方法进行策略更新，平衡探索与利用。
     """
 
-    def __init__(self, agent, lr=3e-4, gamma=0.99, clip_epsilon=0.2):
+    def __init__(self, agent, lr=LEARNING_RATE, gamma=gamma, clip_epsilon=clip_epsilon):
         """
         初始化PPO算法。
 

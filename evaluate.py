@@ -1,43 +1,33 @@
-# evaluate.py
-
 import torch
 from torch.distributions import Categorical
 from agent import CircuitOptimizerAgent
 from environment import QuantumCircuitEnvironment, ActionMask
 from rules import RULES
+from collect_episode_data import collect_episode_data  # 确保已经导入
+import os
+from config import N_QUBITS, N_MOMENTS, N_RULES, N_GATE_CLASSES, N_STEPS
 
-# 配置
-N_QUBITS = 12
-N_MOMENTS = 50
-N_GATE_CLASSES = 4
-N_RULES = len(RULES)
-
-# 加载已训练的智能体
+# 初始化智能体和环境
 agent = CircuitOptimizerAgent(N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES)
-agent.load_state_dict(torch.load('rl_agent.pth'))
-agent.eval()
-
-# 创建模拟器环境
-env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES)
+env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES, N_GATE_CLASSES)
 action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS)
 
-# 评估循环
-state = env.reset()
-done = False
-total_reward = 0
+# 检查和加载模型
+model_path = 'rl_agent.pth'
+if not os.path.exists(model_path):
+    raise FileNotFoundError(f"模型文件 {model_path} 未找到，无法加载模型。")
 
-while not done:
-    with torch.no_grad():
-        policy, _ = agent(state.unsqueeze(0))
-        policy = policy.view(N_RULES, N_QUBITS * N_MOMENTS)
-        masked_policy = policy * action_mask.mask(env.simulator.circuit)
-        #action_dist = Categorical(masked_policy)
-        action_dist = Categorical(masked_policy.flatten())
-        action = action_dist.sample()
+try:
+    agent.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+    agent.eval()
+except RuntimeError as e:
+    print(f"加载模型时遇到错误: {e}")
+    exit(1)
 
-    state, reward, done = env.apply_rule(action.item())
-    total_reward += reward
-    print(f"Action: {action.item()}, Reward: {reward:.3f}")
+# 使用collect_episode_data进行评估
+states, actions, rewards, dones, log_probs, values = collect_episode_data(agent, env, action_mask, max_steps=N_STEPS)
 
-print(f"Total Reward: {total_reward:.3f}")
-print("Evaluation Complete.")
+# 计算总奖励
+total_reward = sum(rewards)
+print(f"Total reward accumulated during the evaluation: {total_reward:.3f}")
+print("Evaluation complete.")

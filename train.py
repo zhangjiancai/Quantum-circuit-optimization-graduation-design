@@ -8,16 +8,22 @@ from environment import QuantumCircuitEnvironment, ActionMask
 from optimizer import PPO
 from rules import RULES
 from collect_episode_data import collect_episode_data
-from config import N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES, EPOCHS, STEPS_PER_EPOCH, LEARNING_RATE, N_STEPS
+from config import N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES, EPOCHS, STEPS_PER_EPOCH, LEARNING_RATE, N_STEPS,gamma,clip_epsilon
 from tqdm import trange
 
 # 加载 RL 智能体
 agent = CircuitOptimizerAgent(N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES)
-ppo = PPO(agent, lr=LEARNING_RATE)
+ppo = PPO(agent, lr=LEARNING_RATE,gamma=gamma,clip_epsilon=clip_epsilon)
+
 
 # 创建模拟器环境
 env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES, N_GATE_CLASSES)
 action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS)
+def print_model_parameters(model):
+    
+    print("Model Parameters:")
+    print(f"N_QUBITS: {N_QUBITS}, N_MOMENTS: {N_MOMENTS}, N_GATE_CLASSES: {N_GATE_CLASSES}, N_RULES: {N_RULES}")
+    print("policy_linear output size:", agent.policy_linear.out_features)
 
 def check_tensor_format(tensor, expected_shape, name):
     if not tensor.size() == expected_shape:
@@ -39,6 +45,7 @@ for epoch in trange(EPOCHS, desc="Epoch"):
             batch_values = values[step::STEPS_PER_EPOCH]
 
             ppo.update(batch_states, batch_actions, batch_rewards, batch_dones, batch_old_log_probs, batch_values)
+            #print_model_parameters(agent)
 
     except Exception as e:
         # 获取详细的错误信息和堆栈跟踪
