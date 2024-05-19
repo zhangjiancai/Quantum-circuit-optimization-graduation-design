@@ -44,14 +44,14 @@ class CircuitOptimizerAgent(nn.Module):
 
     def forward(self, x):
         """前向传播。"""
-        self.bn = nn.BatchNorm2d(256)  # 根据最后一个卷积层的输出通道数
+        #self.bn = nn.BatchNorm2d(256)  # 根据最后一个卷积层的输出通道数
 
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
         x = F.relu(self.conv4(x))
         #卷积网络的输出通过全连接层后可能存在数值稳定性问题，尤其是在使用 softmax 之前。考虑在全连接层之前添加批归一化层（Batch Normalization）来增强模型的数值稳定性和收敛速度。
-        x = self.bn(x)  # 在ReLU和Flatten之间添加批归一化
+        #x = self.bn(x)  # 在ReLU和Flatten之间添加批归一化
 
         # 展平输出
         x_flat = torch.flatten(x, start_dim=1)
