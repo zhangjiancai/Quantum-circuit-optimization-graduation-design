@@ -2,7 +2,6 @@
 
 import cirq
 import numpy as np
-import torch
 
 def rz_rule(simulator):
     """Apply RZ gate to the first qubit."""

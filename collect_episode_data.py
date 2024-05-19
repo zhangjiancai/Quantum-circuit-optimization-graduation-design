@@ -1,9 +1,6 @@
 # collect_episode_data.py
 import torch
 from torch.distributions import Categorical
-from agent import CircuitOptimizerAgent
-from environment import QuantumCircuitEnvironment, ActionMask
-from rules import RULES
 from config import N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES, N_STEPS
 
 
