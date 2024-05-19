@@ -5,12 +5,12 @@ from environment import QuantumCircuitEnvironment, ActionMask
 from rules import RULES
 from collect_episode_data import collect_episode_data  # 确保已经导入
 import os
-from config import N_QUBITS, N_MOMENTS, N_RULES, N_GATE_CLASSES, N_STEPS
+from config import N_QUBITS, N_MOMENTS, N_RULES, N_GATE_CLASSES, N_STEPS,batch_size
 
 # 初始化智能体和环境
 agent = CircuitOptimizerAgent(N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES)
 env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES, N_GATE_CLASSES)
-action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS)
+action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS,batch_size)
 
 # 检查和加载模型
 model_path = 'rl_agent.pth'

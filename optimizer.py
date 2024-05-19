@@ -1,10 +1,8 @@
 # optimizer.py
-import os
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from config import LEARNING_RATE, EPOCHS, STEPS_PER_EPOCH,gamma,clip_epsilon
+from config import LEARNING_RATE, gamma,clip_epsilon
 # 定义PPO类，实现近端策略优化算法
 
 class PPO:

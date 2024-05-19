@@ -2,13 +2,12 @@
 
 import torch
 import traceback
-from torch.distributions import Categorical
 from agent import CircuitOptimizerAgent
 from environment import QuantumCircuitEnvironment, ActionMask
 from optimizer import PPO
 from rules import RULES
 from collect_episode_data import collect_episode_data
-from config import N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES, EPOCHS, STEPS_PER_EPOCH, LEARNING_RATE, N_STEPS,gamma,clip_epsilon
+from config import N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES, EPOCHS, STEPS_PER_EPOCH, LEARNING_RATE, gamma,clip_epsilon,batch_size
 from tqdm import trange
 
 # 加载 RL 智能体
@@ -17,8 +16,8 @@ ppo = PPO(agent, lr=LEARNING_RATE,gamma=gamma,clip_epsilon=clip_epsilon)
 
 
 # 创建模拟器环境
-env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES, N_GATE_CLASSES)
-action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS)
+env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES, N_GATE_CLASSES,batch_size)
+action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS,batch_size)
 def print_model_parameters(model):
     
     print("Model Parameters:")
