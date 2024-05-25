@@ -1,9 +1,7 @@
-# optimizer.py
 import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from config import LEARNING_RATE, gamma,clip_epsilon
-# 定义PPO类，实现近端策略优化算法
+from config import LEARNING_RATE, gamma, clip_epsilon
 
 class PPO:
     """
@@ -38,6 +36,8 @@ class PPO:
         returns, advantages = self.compute_gae(rewards, dones, values)
 
         # 从当前策略中获取新的动作分布和状态价值
+        #states = states.squeeze(0)
+        print("Adjusted states shape:", states.shape)
         new_policy, new_values = self.agent(states)
 
         # 计算新策略下动作的对数概率
@@ -46,31 +46,21 @@ class PPO:
         # 计算重要性采样比值（ratio）
         ratio = torch.exp(new_log_probs - old_log_probs)
 
-        # 假设advantages是(batch_size, )或(batch_size, sequence_length)的形状
         mean_advantages = advantages.mean(dim=0 if advantages.dim() == 2 else None)  # 正确处理一维或二维张量
         std_advantages = advantages.std(dim=0 if advantages.dim() == 2 else None, unbiased=False)  # 同上，unbiased=False忽略样本数减1
         advantages = (advantages - mean_advantages) / (std_advantages + 1e-8)
 
         # 计算损失函数的两部分：策略损失（通过裁剪）和价值函数损失（可选的裁剪形式）
-        # 假设surr1和surr2的计算方式
         surr1 = ratio * advantages
         surr2 = torch.clamp(ratio, 1.0 - self.clip_epsilon, 1.0 + self.clip_epsilon) * advantages
         policy_loss = -torch.min(surr1, surr2).mean()
 
         # 价值函数损失计算，考虑了裁剪以减少更新波动
-        # 假设returns的原始形状是[batch_size, sequence_length]
-        returns = returns.sum(dim=0)  # 累加sequence_length维度
-        #returns = torch.tensor(returns, dtype=torch.float32).unsqueeze(0)  # 如果returns是Python标量，转换为张量并增加一维
-        returns = returns.clone().detach().unsqueeze(0) #这段代码首先使用.clone()创建returns张量的一个副本，这样就断开了与原始计算图的连接。然后，使用.detach()确保新创建的张量不会跟踪任何历史梯度。最后，unsqueeze(0)用于在张量的最前面添加一个维度。这样，即使returns是一个标量，也能得到一个形状为(1, sequence_length)的张量。
-        
-        # 假设new_values的原始形状是[batch_size, sequence_length]
-        new_values_aggregated = new_values.sum(dim=0)  # 累加sequence_length维度
-        value_loss = F.mse_loss(new_values_aggregated, returns)
-        # 修正 `value_loss` 计算
-        #value_loss = F.mse_loss(new_values.squeeze(), returns)
+        returns = returns.clone().detach()
+        value_loss = F.mse_loss(new_values, returns)
+
         # 计算策略熵，鼓励探索
         new_policy_normalized = F.softmax(new_policy, dim=-1)
-        # 现在使用归一化后的概率分布来计算熵
         entropy = Categorical(probs=new_policy_normalized).entropy().mean()
 
         # 总损失，结合策略损失、价值损失和熵项
@@ -98,54 +88,35 @@ class PPO:
         gae_lambda = 0.95  # GAE中的衰减因子λ
         last_gae_lam = 0
 
-        # 修改循环，使其不包括最后一个元素，避免索引越界
-        for t in reversed(range(len(rewards) - 1)):  # 减1以避免索引越界
-            next_non_terminal = 1.0 - dones[t+1]
-            delta = rewards[t] + self.gamma * values[t+1] * next_non_terminal - values[t]
+        for t in reversed(range(len(rewards) - 1)):
+            next_non_terminal = ~dones[t + 1]
+            delta = rewards[t] + self.gamma * values[t + 1] * next_non_terminal - values[t]
             advantages[t] = delta + self.gamma * gae_lambda * next_non_terminal * last_gae_lam
             last_gae_lam = advantages[t]
-
-        # 对于序列的第一个元素（t=0），我们需要特殊处理，这里直接设置为累计的优势
-        # 注意，因为我们已经处理到了t=1（原序列的倒数第二个元素），所以不需要额外的循环迭代
-        #advantages[0] = advantages[0]  # 这一行实际上不需要操作，因为第一个元素的advantage已经在循环中计算好
 
         returns = advantages + values
         return returns, advantages
 
-    def compute_log_probs(self,policy, actions):
+    def compute_log_probs(self, policy, actions):
         """
-            计算在给定动作分布下选择的动作的对数概率。
-    
+        计算在给定动作分布下选择的动作的对数概率。
+
         参数：
-            policy (torch.Tensor): 策略输出，形状为 [batch_size, n_rules, n_qubits * n_moments]
-            actions (torch.Tensor): 动作索引，形状为 [batch_size, 2]，其中包括规则索引和量子位时刻索引。
+            policy (torch.Tensor): 策略输出，[probability, num_qubits, num_transform_rules, num_timesteps]
+            actions (torch.Tensor): 动作索引，(rule_index, qubit_index, timestep_index)。
         """
-        # 提取规则索引和量子位时刻索引
         rule_indices = actions[:, 0]
-        qubit_moment_indices = actions[:, 1]
+        qubit_indices = actions[:, 1]
+        timestep_indices = actions[:, 2]
 
-        # 批次大小
-        batch_size = policy.shape[0]
-
-        # 收集对应的概率
-        log_probs = torch.zeros(batch_size)
-        for i in range(batch_size):
-            # 获取单个样本的规则对应的概率分布
-            rule_prob = policy[i, rule_indices[i]]
-
-            # 计算未规范化概率
-            unnormalized_probs = torch.exp(rule_prob)
-
-            # 规范化概率以满足概率分布的约束
-            probs = unnormalized_probs / unnormalized_probs.sum(dim=0, keepdim=True)
-
-            # 处理可能出现的NaN或无穷大值
-            probs[torch.isnan(probs)] = 0.0
-            probs[probs == float('inf')] = 0.0
-
+        log_probs = []
+        for i in range(policy.size(0)):
+            # 从策略张量中获取指定规则、量子位和时间步的概率分布
+            probs = policy[i, qubit_indices[i], rule_indices[i], timestep_indices[i]]
+            
             # 创建Categorical分布对象并计算对数概率
             dist = Categorical(probs=probs)
-            log_prob = dist.log_prob(qubit_moment_indices[i])
-            log_probs[i] = log_prob
+            log_prob = dist.log_prob(torch.tensor([timestep_indices[i]]).to(probs.device))
+            log_probs.append(log_prob)
 
-        return log_probs
+        return torch.stack(log_probs)
