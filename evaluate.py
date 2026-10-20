@@ -1,33 +1,31 @@
-import torch
-from torch.distributions import Categorical
-from agent import CircuitOptimizerAgent
-from environment import QuantumCircuitEnvironment, ActionMask
-from rules import RULES
-from collect_episode_data import collect_episode_data  # 确保已经导入
-import os
-from config import N_QUBITS, N_MOMENTS, N_RULES, N_GATE_CLASSES, N_STEPS
+"""根目录评估入口（薄封装）。
 
-# 初始化智能体和环境
-agent = CircuitOptimizerAgent(N_QUBITS, N_MOMENTS, N_GATE_CLASSES, N_RULES)
-env = QuantumCircuitEnvironment(N_QUBITS, N_MOMENTS, RULES, N_GATE_CLASSES)
-action_mask = ActionMask(N_RULES, N_QUBITS, N_MOMENTS)
+等价于 ``python scripts/evaluate.py``，保留原仓库的根目录文件名习惯。
+参数与行为完全由 :mod:`scripts.evaluate` 提供，见::
 
-# 检查和加载模型
-model_path = 'rl_agent.pth'
-if not os.path.exists(model_path):
-    raise FileNotFoundError(f"模型文件 {model_path} 未找到，无法加载模型。")
+    python evaluate.py --help
+"""
 
-try:
-    agent.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
-    agent.eval()
-except RuntimeError as e:
-    print(f"加载模型时遇到错误: {e}")
-    exit(1)
+from __future__ import annotations
 
-# 使用collect_episode_data进行评估
-states, actions, rewards, dones, log_probs, values = collect_episode_data(agent, env, action_mask, max_steps=N_STEPS)
+import runpy
+import sys
+from pathlib import Path
 
-# 计算总奖励
-total_reward = sum(rewards)
-print(f"Total reward accumulated during the evaluation: {total_reward:.3f}")
-print("Evaluation complete.")
+ROOT = Path(__file__).resolve().parent
+
+
+def main() -> int:
+    """以 ``__main__`` 方式执行 ``scripts/evaluate.py`` 并返回其退出码。"""
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    try:
+        runpy.run_path(str(ROOT / "scripts" / "evaluate.py"), run_name="__main__")
+    except SystemExit as exit_signal:  # argparse 的 --help / 参数错误走 SystemExit
+        code = exit_signal.code
+        return 0 if code is None else int(code)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

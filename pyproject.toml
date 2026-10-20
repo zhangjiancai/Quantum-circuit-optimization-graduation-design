@@ -1,0 +1,42 @@
+# 工程与打包配置（本科毕业设计重写版）
+#
+# 项目本身以“源码目录 + 脚本”方式使用即可，不强制 pip install -e .；
+# 本文件同时提供包元数据、可选依赖与 pytest 配置。
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quantum-circuit-optimization"
+version = "1.0.0"
+description = "基于 PPO 强化学习的量子电路等价重写优化（毕业设计重写版）"
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["quantum-circuit", "reinforcement-learning", "PPO", "circuit-optimization"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Intended Audience :: Education",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=1.24",
+    "torch>=2.0",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+# 可选：与 Cirq 互操作、画图、交叉验证（核心逻辑不依赖 cirq）
+cirq = ["cirq>=1.0"]
+# 开发与测试
+dev = ["pytest>=7.0"]
+
+[tool.setuptools]
+# 只打包核心库；scripts/tests 通过源码目录直接运行
+packages = ["qco"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

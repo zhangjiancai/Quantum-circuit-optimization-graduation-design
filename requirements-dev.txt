@@ -1,0 +1,12 @@
+# 开发/测试依赖（在 requirements.txt 基础上追加）
+#
+# 安装：
+#   C:\Users\zjc20\quantum-circuit-optimization\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+
+-r requirements.txt
+
+pytest>=7.0
+
+# 可选：想直接运行 notebooks/quickstart.ipynb 时安装
+# jupyterlab>=4.0
+# nbformat>=5.9

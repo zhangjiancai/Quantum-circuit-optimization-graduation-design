@@ -1,0 +1,42 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# ===== 虚拟环境 =====
+.venv/
+venv/
+env/
+
+# ===== 训练产物（可由命令复现） =====
+# 训练日志、checkpoint、评估结果、图表默认写入 results/，不纳入版本库
+results/*
+!results/.gitkeep
+*.pt
+*.pth
+
+# 数据集可由 scripts/make_dataset.py 用固定种子重新生成
+data/*.json
+!data/.gitkeep
+
+# ===== Notebook =====
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# ===== 编辑器 / 操作系统 =====
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 临时文件 =====
+*.log
+*.tmp
+*.bak
